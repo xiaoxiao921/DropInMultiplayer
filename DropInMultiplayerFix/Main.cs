@@ -26,12 +26,14 @@ namespace DropInMultiplayer
         public static ConfigEntry<bool> HostOnlySpawnAs { get; set; }
         public static ConfigEntry<bool> GiveLunarItems { get; set; }
         public static ConfigEntry<bool> GiveRedItems { get; set; }
+        public static ConfigEntry<bool> GiveBossItems { get; set; }
         public static ConfigEntry<bool> GiveExactItems { get; set; }
 
         //unused bool for roguewisp
         //private bool RogueWisp = false;
         private static DropInMultiplayer instance { get; set; }
-        //survivor list for NormalSurvivorsOnly
+        //survivor list for NormalSurvivorsOnly 
+        //should probably just use the in-game enum
         public static List<string> survivorList = new List<string>{
             "CommandoBody",
             "HuntressBody",
@@ -122,9 +124,24 @@ namespace DropInMultiplayer
             new List<string> { "RoboBallMiniBody", "Solus", "Probe"},
             new List<string> { "ScavBody", "Scav", "Scavenger"},
             new List<string> { "NullifierBody", "VoidReaver", "Reaver", "Void"},
-
         };
-        //fetches the body name from string
+        //thanks hopoo
+        public static List<ItemIndex> bossitemList = new List<ItemIndex>{
+            ItemIndex.NovaOnLowHealth,
+            ItemIndex.Knurl,
+            ItemIndex.BeetleGland,
+            ItemIndex.TitanGoldDuringTP,
+            ItemIndex.SprintWisp,
+            //Excluding pearls because those aren't boss items, they come from the Cleansing Pool 
+        };
+        /*
+        public static List<ItemIndex> WorldUnique = new List<ItemIndex>{
+            ItemIndex.Pearl,
+            ItemIndex.ShinyPearl,
+            //Yes, I do know TitanGoldDuringTP is in the WorldUnique catagory, but you have to fight a boss for it. Hence why it's not in this list
+            //Suddenly, I realize that this list is unneeded.
+        };
+        */
         public static string GetBodyNameFromString(string name)
         {
 
@@ -138,9 +155,26 @@ namespace DropInMultiplayer
                     }
                 }
             }
-
             return name;
         }
+        //fetches the body name from string
+        //should work but i'm not too sure, i need to learn more about enums
+        /*public static string GetBodyNameFromString(string name)
+        {
+
+            foreach (var bodyLists in (SurvivorIndex[])Enum.GetValues(typeof(SurvivorIndex)))
+            {
+                foreach (var tempName in (SurvivorIndex[])Enum.GetValues(typeof(SurvivorIndex)))
+                {
+                    if (SurvivorIndex.Equals(name, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return bodyLists[1];
+                    }
+                }   
+            }
+
+            return name;
+        }*/
 
         public void Awake()
         {
@@ -160,7 +194,9 @@ namespace DropInMultiplayer
             HostOnlySpawnAs = Config.Bind("Enable/Disable", "HostOnlySpawnAs", false, "Changes the dim_spawn_as command to be host only");
             GiveLunarItems = Config.Bind("Enable/Disable", "GiveLunarItems", false, "Allows lunar items to be given to players, needs StartWithItems to be enabled!");
             GiveRedItems = Config.Bind("Enable/Disable", "GiveRedItems", true, "Allows red items to be given to players, needs StartWithItems to be enabled!");
-            GiveExactItems = Config.Bind("Enable/Disable", "GiveExactItems", false, "Chooses a random member in the game and gives the new player their items, should be used with ShareSuite, needs StartWithItems to be enabled!");
+            GiveBossItems = Config.Bind("Enable/Disable", "GiveRedItems", true, "Allows boss items to be given to players, needs StartWithItems to be enabled!");
+            //GiveExactItems = Config.Bind("Enable/Disable", "GiveExactItems", false, "Chooses a random member in the game and gives the new player their items, should be used with ShareSuite, needs StartWithItems to be enabled!");
+
             //support for wispy, coming when rein changes the body name
             /*if (BepInEx.Bootstrap.Chainloader.PluginInfos.ContainsKey("com.ReinThings.RogueWisp"))
             {
@@ -363,12 +399,15 @@ namespace DropInMultiplayer
             averageItemCountT2 = average item count tier 2 
             averageItemCountT3 = average item count tier 3
             averageItemCountTL = average item count tier lunar
+            averageItemCountTB = average item count tier boss
             yes i do know lunar isn't really a tier but shhhhhhhhhhh
             */
             int averageItemCountT1 = 0;
             int averageItemCountT2 = 0;
             int averageItemCountT3 = 0;
             int averageItemCountTL = 0;
+            int averageItemCountTB = 0;
+
             ReadOnlyCollection<NetworkUser> readOnlyInstancesList = NetworkUser.readOnlyInstancesList;
 
             int playerCount = PlayerCharacterMasterController.instances.Count;
@@ -386,24 +425,29 @@ namespace DropInMultiplayer
                 averageItemCountT2 += cm.inventory.GetTotalItemCountOfTier(ItemTier.Tier2);
                 averageItemCountT3 += cm.inventory.GetTotalItemCountOfTier(ItemTier.Tier3);
                 averageItemCountTL += cm.inventory.GetTotalItemCountOfTier(ItemTier.Lunar);
+                averageItemCountTB += cm.inventory.GetTotalItemCountOfTier(ItemTier.Boss);
             }
 
             averageItemCountT1 /= playerCount;
             averageItemCountT2 /= playerCount;
             averageItemCountT3 /= playerCount;
             averageItemCountTL /= playerCount;
+            averageItemCountTB /= playerCount;
 
             CharacterMaster characterMaster = user.master;
             int itemCountT1 = averageItemCountT1 - characterMaster.inventory.GetTotalItemCountOfTier(ItemTier.Tier1);
             int itemCountT2 = averageItemCountT2 - characterMaster.inventory.GetTotalItemCountOfTier(ItemTier.Tier2);
             int itemCountT3 = averageItemCountT3 - characterMaster.inventory.GetTotalItemCountOfTier(ItemTier.Tier3);
             int itemCountTL = averageItemCountTL - characterMaster.inventory.GetTotalItemCountOfTier(ItemTier.Lunar);
+            int itemCountTB = averageItemCountTL - characterMaster.inventory.GetTotalItemCountOfTier(ItemTier.Boss);
 
             itemCountT1 = itemCountT1 < 0 ? 0 : itemCountT1;
             itemCountT2 = itemCountT2 < 0 ? 0 : itemCountT2;
             itemCountT3 = itemCountT3 < 0 ? 0 : itemCountT3;
             itemCountTL = itemCountTL < 0 ? 0 : itemCountTL;
-            
+            itemCountTB = itemCountTB < 0 ? 0 : itemCountTB;
+
+            /*
             if (GiveExactItems.Value)
             {
                 characterMaster.inventory.GiveItem(GetRandomItem(ItemCatalog.tier1ItemList), itemCountT1);
@@ -416,7 +460,7 @@ namespace DropInMultiplayer
                 {
                     characterMaster.inventory.GiveItem(GetRandomItem(ItemCatalog.lunarItemList), itemCountTL);
                 }
-            }
+            }*/
             Debug.Log(itemCountT1 + " " + itemCountT2 + " " + itemCountT3 + " itemcount to add");
             Debug.Log(averageItemCountT1 + " " + averageItemCountT2 + " " + averageItemCountT3 + " average");
             for (int i = 0; i < itemCountT1; i++)
@@ -441,6 +485,13 @@ namespace DropInMultiplayer
                     characterMaster.inventory.GiveItem(GetRandomItem(ItemCatalog.lunarItemList), 1);
                 }
             }
+            if (GiveBossItems.Value)
+            {
+                for (int i = 0; i < itemCountTB; i++)
+                {
+                    characterMaster.inventory.GiveItem(GetRandomItem(bossitemList), 1);
+                }
+            }
         }
         //this is how i get the random item, it just cycles through the itemindex for something to give
         private ItemIndex GetRandomItem(List<ItemIndex> items)
@@ -449,6 +500,16 @@ namespace DropInMultiplayer
 
             return items[itemID];
         }
+
+        /*
+        private ItemTier GetRandomItemButBadly(List<ItemTier> itemT)
+        {
+            int itemTID = UnityEngine.Random.Range(0, itemT.Count);
+
+            return itemT[itemTID];
+        }
+        */
+
         //this is the command
         [ConCommand(commandName = "dim_spawn_as", flags = ConVarFlags.ExecuteOnServer, helpText = "Spawn as a new character. Type body_list for a full list of characters")]
         private static void CCSpawnAs(ConCommandArgs args)
