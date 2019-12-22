@@ -26,6 +26,8 @@ namespace DropInMultiplayer
         public static ConfigEntry<bool> HostOnlySpawnAs { get; set; }
         public static ConfigEntry<bool> GiveLunarItems { get; set; }
         public static ConfigEntry<bool> GiveRedItems { get; set; }
+        public static ConfigEntry<bool> GiveExactItems { get; set; }
+
         //unused bool for roguewisp
         //private bool RogueWisp = false;
         private static DropInMultiplayer instance { get; set; }
@@ -158,6 +160,7 @@ namespace DropInMultiplayer
             HostOnlySpawnAs = Config.Bind("Enable/Disable", "HostOnlySpawnAs", false, "Changes the dim_spawn_as command to be host only");
             GiveLunarItems = Config.Bind("Enable/Disable", "GiveLunarItems", false, "Allows lunar items to be given to players, needs StartWithItems to be enabled!");
             GiveRedItems = Config.Bind("Enable/Disable", "GiveRedItems", true, "Allows red items to be given to players, needs StartWithItems to be enabled!");
+            GiveExactItems = Config.Bind("Enable/Disable", "GiveExactItems", false, "Chooses a random member in the game and gives the new player their items, should be used with ShareSuite, needs StartWithItems to be enabled!");
             //support for wispy, coming when rein changes the body name
             /*if (BepInEx.Bootstrap.Chainloader.PluginInfos.ContainsKey("com.ReinThings.RogueWisp"))
             {
@@ -354,6 +357,14 @@ namespace DropInMultiplayer
                 return;
             }
 
+            //the way i did this is confusing so i'm just gonna explain these int names
+            /*
+            averageItemCountT1 = average item count tier 1 
+            averageItemCountT2 = average item count tier 2 
+            averageItemCountT3 = average item count tier 3
+            averageItemCountTL = average item count tier lunar
+            yes i do know lunar isn't really a tier but shhhhhhhhhhh
+            */
             int averageItemCountT1 = 0;
             int averageItemCountT2 = 0;
             int averageItemCountT3 = 0;
@@ -370,7 +381,7 @@ namespace DropInMultiplayer
             {
                 if (readOnlyInstancesList[i].id.Equals(user.id))
                     continue;
-               CharacterMaster cm = readOnlyInstancesList[i].master;
+                CharacterMaster cm = readOnlyInstancesList[i].master;
                 averageItemCountT1 += cm.inventory.GetTotalItemCountOfTier(ItemTier.Tier1);
                 averageItemCountT2 += cm.inventory.GetTotalItemCountOfTier(ItemTier.Tier2);
                 averageItemCountT3 += cm.inventory.GetTotalItemCountOfTier(ItemTier.Tier3);
@@ -392,7 +403,20 @@ namespace DropInMultiplayer
             itemCountT2 = itemCountT2 < 0 ? 0 : itemCountT2;
             itemCountT3 = itemCountT3 < 0 ? 0 : itemCountT3;
             itemCountTL = itemCountTL < 0 ? 0 : itemCountTL;
-
+            
+            if (GiveExactItems.Value)
+            {
+                characterMaster.inventory.GiveItem(GetRandomItem(ItemCatalog.tier1ItemList), itemCountT1);
+                characterMaster.inventory.GiveItem(GetRandomItem(ItemCatalog.tier2ItemList), itemCountT2);
+                if (GiveRedItems.Value)
+                {
+                    characterMaster.inventory.GiveItem(GetRandomItem(ItemCatalog.tier3ItemList), itemCountT3);
+                }
+                if (GiveLunarItems.Value)
+                {
+                    characterMaster.inventory.GiveItem(GetRandomItem(ItemCatalog.lunarItemList), itemCountTL);
+                }
+            }
             Debug.Log(itemCountT1 + " " + itemCountT2 + " " + itemCountT3 + " itemcount to add");
             Debug.Log(averageItemCountT1 + " " + averageItemCountT2 + " " + averageItemCountT3 + " average");
             for (int i = 0; i < itemCountT1; i++)
