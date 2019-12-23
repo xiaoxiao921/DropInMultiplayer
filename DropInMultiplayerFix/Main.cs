@@ -29,7 +29,23 @@ namespace DropInMultiplayer
 
         private static DropInMultiplayer instance { get; set; }
 
+
         private static List<string> survivorList;
+=======
+        //survivor list for NormalSurvivorsOnly 
+        //should probably just use the in-game enum
+        public static List<string> survivorList = new List<string>{
+            "CommandoBody",
+            "HuntressBody",
+            "EngiBody",
+            "ToolbotBody",
+            "MercBody",
+            "MageBody",
+            "BanditBody",
+            "TreebotBody",
+            "LoaderBody",
+            "CrocoBody",
+        };
         //body list, it also contains aliases for bodies
         public static List<List<string>> bodyList = new List<List<string>> {
             new List<string> { "AssassinBody", "Assassin"},
@@ -108,7 +124,6 @@ namespace DropInMultiplayer
             new List<string> { "RoboBallMiniBody", "Solus", "Probe"},
             new List<string> { "ScavBody", "Scav", "Scavenger"},
             new List<string> { "NullifierBody", "VoidReaver", "Reaver", "Void"},
-
         };
         //thanks hopoo
         public static List<ItemIndex> bossitemList = new List<ItemIndex>{
@@ -140,7 +155,6 @@ namespace DropInMultiplayer
                     }
                 }
             }
-
             return name;
         }
         //fetches the body name from string
@@ -178,7 +192,7 @@ namespace DropInMultiplayer
             HostOnlySpawnAs = Config.Bind("Enable/Disable", "HostOnlySpawnAs", false, "Changes the dim_spawn_as command to be host only");
             GiveLunarItems = Config.Bind("Enable/Disable", "GiveLunarItems", false, "Allows lunar items to be given to players, needs StartWithItems to be enabled!");
             GiveRedItems = Config.Bind("Enable/Disable", "GiveRedItems", true, "Allows red items to be given to players, needs StartWithItems to be enabled!");
-            GiveBossItems = Config.Bind("Enable/Disable", "GiveRedItems", true, "Allows boss items to be given to players, needs StartWithItems to be enabled!");
+            GiveBossItems = Config.Bind("Enable/Disable", "GiveBossItems", true, "Allows boss items to be given to players, needs StartWithItems to be enabled!");
             //GiveExactItems = Config.Bind("Enable/Disable", "GiveExactItems", false, "Chooses a random member in the game and gives the new player their items, should be used with ShareSuite, needs StartWithItems to be enabled!");
 
             //support for wispy, coming when rein changes the body name
@@ -390,6 +404,7 @@ namespace DropInMultiplayer
             averageItemCountT2 = average item count tier 2 
             averageItemCountT3 = average item count tier 3
             averageItemCountTL = average item count tier lunar
+            averageItemCountTB = average item count tier boss
             yes i do know lunar isn't really a tier but shhhhhhhhhhh
             */
             int averageItemCountT1 = 0;
@@ -452,6 +467,7 @@ namespace DropInMultiplayer
                 }
             }
             */
+
             Debug.Log(itemCountT1 + " " + itemCountT2 + " " + itemCountT3 + " itemcount to add");
             Debug.Log(averageItemCountT1 + " " + averageItemCountT2 + " " + averageItemCountT3 + " average");
             for (int i = 0; i < itemCountT1; i++)
