@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using RoR2;
 using UnityEngine;
 using System.Collections;
+using System.Linq;
 using BepInEx.Configuration;
 using UnityEngine.Networking;
 
@@ -12,9 +13,6 @@ namespace DropInMultiplayer
 {
     [BepInDependency("com.bepis.r2api")]
     [BepInPlugin("com.SushiDev.DropInMultiplayer", "DropInMultiplayer", "3.0.1")]
-    //makes sure that this mod loads after roguewisp to prevent issues
-    //unused until rein changes body naem
-    //[BepInDependency("com.ReinThings.RogueWisp", BepInDependency.DependencyFlags.SoftDependency)]
     public class DropInMultiplayer : BaseUnityPlugin
     {
         //configx
@@ -28,22 +26,9 @@ namespace DropInMultiplayer
         public static ConfigEntry<bool> GiveRedItems { get; set; }
         public static ConfigEntry<bool> GiveExactItems { get; set; }
 
-        //unused bool for roguewisp
-        //private bool RogueWisp = false;
         private static DropInMultiplayer instance { get; set; }
-        //survivor list for NormalSurvivorsOnly
-        public static List<string> survivorList = new List<string>{
-            "CommandoBody",
-            "HuntressBody",
-            "EngiBody",
-            "ToolbotBody",
-            "MercBody",
-            "MageBody",
-            "BanditBody",
-            "TreebotBody",
-            "LoaderBody",
-            "CrocoBody",
-        };
+
+        private static List<string> survivorList;
         //body list, it also contains aliases for bodies
         public static List<List<string>> bodyList = new List<List<string>> {
             new List<string> { "AssassinBody", "Assassin"},
@@ -193,8 +178,20 @@ namespace DropInMultiplayer
             };
 
             On.RoR2.Run.SetupUserCharacterMaster += SetupUserCharacterMaster;
-            On.RoR2.Chat.UserChatMessage.ConstructChatString += UserChatMessage_ConstructChatString;
+            On.RoR2.Console.RunCmd += CheckIfCmdIsRequest;
         }
+
+        public void Start()
+        {
+            //Fill the survivorList with the one from the game code.
+            survivorList = new List<string>();
+
+            foreach (var survivorDef in SurvivorCatalog.allSurvivorDefs)
+            {
+                survivorList.Add(survivorDef.bodyPrefab.name);
+            }
+        }
+
         //adds a chat message, this is how the hello message functions
         private static void AddChatMessage(string message, float time = 0.1f)
         {
@@ -208,29 +205,24 @@ namespace DropInMultiplayer
             Chat.SendBroadcastChat(chatMessage);
 
         }
-        //hooks the chat so sending stuff like "dim_spawn_as Loadie" works
-        private string UserChatMessage_ConstructChatString(On.RoR2.Chat.UserChatMessage.orig_ConstructChatString orig, Chat.UserChatMessage self)
+
+        private void CheckIfCmdIsRequest(On.RoR2.Console.orig_RunCmd orig, RoR2.Console self, NetworkUser sender, string conCommandName, List<string> userArgs)
         {
+            orig(self, sender, conCommandName, userArgs);
 
-            if (!NetworkServer.active)
+            if (conCommandName.Equals("say", StringComparison.OrdinalIgnoreCase))
             {
-                return orig(self);
+                var userMsg = ArgsHelper.GetValue(userArgs, 0).ToLower();
+                var isRequest = userMsg.StartsWith("dim_spawn_as");
+                if (isRequest)
+                {
+                    var argsRequest = userMsg.Split(' ').ToList();
+                    string bodyString = ArgsHelper.GetValue(argsRequest, 1);
+                    string userString = ArgsHelper.GetValue(argsRequest, 2);
+
+                    SpawnAs(sender.GetComponent<NetworkUser>(), bodyString, userString);
+                }
             }
-
-            List<string> split = new List<string>(self.text.Split(Char.Parse(" ")));
-            string commandName = ArgsHelper.GetValue(split, 0);
-
-            if (commandName.Equals("dim_spawn_as", StringComparison.OrdinalIgnoreCase))
-            {
-
-
-                string bodyString = ArgsHelper.GetValue(split, 1);
-                string userString = ArgsHelper.GetValue(split, 2);
-
-
-                SpawnAs(self.sender.GetComponent<NetworkUser>(), bodyString, userString);
-            }
-            return orig(self);
         }
 
         [Server]
@@ -266,6 +258,7 @@ namespace DropInMultiplayer
             //normalsurvivorsonly 
             if (NormalSurvivorsOnly.Value)
             {
+
                 if (!survivorList.Contains(bodyString))
                 {
                     AddChatMessage("You can only spawn as normal survivors");
@@ -282,10 +275,8 @@ namespace DropInMultiplayer
                 if (AllowSpawnAsWhileAlive.Value && master.alive)
                 {
                     master.bodyPrefab = bodyPrefab;
-                    string bodystringname;
-                    bodystringname = Resources.Load<GameObject>($"prefabs/characterbodies/" + bodyString + "").GetComponent<CharacterBody>().baseNameToken;
                     master.Respawn(master.GetBody().transform.position, master.GetBody().transform.rotation);
-                    AddChatMessage(player.userName + " is spawning as " + bodystringname + "!");
+                    AddChatMessage(player.userName + " is spawning as " + Language.GetString(bodyPrefab.GetComponent<CharacterBody>().baseNameToken) + "!");
                 }
                 else if (!master.alive)
                 {
@@ -305,9 +296,10 @@ namespace DropInMultiplayer
                 user.master.bodyPrefab = bodyPrefab;
 
                 Transform spawnTransform = Stage.instance.GetPlayerSpawnTransform();
-                CharacterBody body = user.master.SpawnBody(bodyPrefab, spawnTransform.position, spawnTransform.rotation);
+                var UpOffset = new Vector3(0, 3, 0);
+                CharacterBody body = user.master.SpawnBody(bodyPrefab, spawnTransform.position + UpOffset, spawnTransform.rotation);
 
-                Run.instance.HandlePlayerFirstEntryAnimation(body, spawnTransform.position, spawnTransform.rotation);
+                Run.instance.HandlePlayerFirstEntryAnimation(body, spawnTransform.position + UpOffset, spawnTransform.rotation);
                 AddChatMessage(player.userName + " spawning as " + bodyString);
                 if (!ImmediateSpawn.Value)
                     Run.instance.SetFieldValue("allowNewParticipants", false);
